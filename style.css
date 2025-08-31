@@ -1,4 +1,35 @@
+/* تنسيقات إضافية لرأس الصفحة */
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0 20px;
+}
+
+.home-icon-link {
+    position: absolute;
+    right: 20px;
+    font-size: 1.5rem;
+    color: white;
+    transition: transform 0.3s;
+    text-decoration: none;
+}
+
+.home-icon-link:hover {
+    transform: scale(1.1);
+}
+
+header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 0;
+}
+
+
 /* روابط التنقل */
+
 .home-icon-link {
     position: absolute;
     right: 20px;
