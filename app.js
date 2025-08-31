@@ -1,11 +1,51 @@
-// استيراد تكوين Firebase
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics.js";
 import { 
-  app, analytics, auth, database, storage,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  onAuthStateChanged, signOut, ref, set, push, onValue, 
-  serverTimestamp, update, remove, query, orderByChild, 
-  equalTo, storageRef, uploadBytesResumable, getDownloadURL 
-} from './firebase-config.js';
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { 
+  getDatabase, 
+  ref, 
+  set, 
+  push, 
+  onValue, 
+  serverTimestamp, 
+  update, 
+  remove, 
+  query, 
+  orderByChild, 
+  equalTo 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+import { 
+  getStorage, 
+  ref as storageRef, 
+  uploadBytesResumable, 
+  getDownloadURL 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAzYZMxqNmnLMGYnCyiJYPg2MbxZMt0co0",
+  authDomain: "osama-91b95.firebaseapp.com",
+  databaseURL: "https://osama-91b95-default-rtdb.firebaseio.com",
+  projectId: "osama-91b95",
+  storageBucket: "osama-91b95.appspot.com",
+  messagingSenderId: "118875905722",
+  appId: "1:118875905722:web:200bff1bd99db2c1caac83",
+  measurementId: "G-LEM5PVPJZC"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth(app);
+const database = getDatabase(app);
+const storage = getStorage(app);
 
 // متغيرات النظام
 let activeUserId = null;
@@ -19,7 +59,6 @@ let adminUsers = [];
 let currentOrders = [];
 let currentOrder = null;
 let ordersListener = null;
-let currentPostId = null;
 
 // تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,6 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // تهيئة التطبيق بناءً على الصفحة الحالية
 function initializeApp() {
+    console.log("Initializing app...");
+    
     // تحميل المشرفين
     loadAdminUsers();
     
@@ -37,28 +78,37 @@ function initializeApp() {
     // التحقق من حالة المصادقة
     onAuthStateChanged(auth, user => {
         if (user) {
+            console.log("User is signed in:", user.uid);
+            
             // تحميل بيانات المستخدم الحالي
             const userRef = ref(database, 'users/' + user.uid);
             onValue(userRef, (snapshot) => {
                 if (snapshot.exists()) {
                     currentUserData = snapshot.val();
                     currentUserData.uid = user.uid;
+                    console.log("User data loaded:", currentUserData);
                     
                     // عرض/إخفاء أيقونة الإدارة
                     toggleAdminIcon();
                     
                     // تحميل المحتوى بناءً على الصفحة الحالية
                     loadPageContent();
+                } else {
+                    console.log("No user data available");
                 }
             });
         } else {
+            console.log("User is signed out");
             // إذا لم يكن المستخدم مسجلاً دخوله، إعادة توجيه إلى صفحة المصادقة
-            // ولكن فقط إذا لم نكن بالفعل في صفحة المصادقة
+            // ولكن فقط إذا لم نكن بالفعل في صفحة المصادقة أو الرئيسية
             if (!window.location.pathname.includes('auth.html') && 
                 !window.location.pathname.includes('index.html') &&
                 window.location.pathname !== '/' &&
                 !window.location.pathname.endsWith('/')) {
                 window.location.href = 'auth.html';
+            } else {
+                // تحميل المحتوى للصفحات التي لا تتطلب تسجيل دخول
+                loadPageContent();
             }
         }
     });
@@ -71,6 +121,8 @@ function initializeApp() {
 function loadPageContent() {
     const path = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
+    
+    console.log("Loading content for page:", path);
     
     if (path.includes('index.html') || path === '/' || path.endsWith('/')) {
         loadPosts();
@@ -96,67 +148,104 @@ function loadPageContent() {
             // إذا لم يتم توفير معرف الطلب، العودة إلى صفحة الطلبات
             window.location.href = 'orders.html';
         }
+    } else if (path.includes('auth.html')) {
+        // لا تحتاج صفحة المصادقة إلى تحميل محتوى إضافي
+        console.log("Auth page loaded");
+    } else if (path.includes('add-post.html')) {
+        // لا تحتاج صفحة إضافة المنشور إلى تحميل محتوى إضافي
+        console.log("Add post page loaded");
     }
 }
 
 // إرفاق معالجات الأحداث بناءً على العناصر المتوفرة في الصفحة
 function attachEventHandlers() {
+    console.log("Attaching event handlers...");
+    
     // معالجات أحداث صفحة المصادقة
-    if (document.getElementById('login-btn')) {
-        document.getElementById('login-btn').addEventListener('click', handleLogin);
+    const loginBtn = document.getElementById('login-btn');
+    const signupBtn = document.getElementById('signup-btn');
+    const loginTab = document.getElementById('login-tab');
+    const signupTab = document.getElementById('signup-tab');
+    
+    if (loginBtn) {
+        console.log("Found login button");
+        loginBtn.addEventListener('click', handleLogin);
     }
     
-    if (document.getElementById('signup-btn')) {
-        document.getElementById('signup-btn').addEventListener('click', handleSignup);
+    if (signupBtn) {
+        console.log("Found signup button");
+        signupBtn.addEventListener('click', handleSignup);
     }
     
-    if (document.getElementById('login-tab')) {
-        document.getElementById('login-tab').addEventListener('click', () => switchAuthTab('login'));
+    if (loginTab) {
+        console.log("Found login tab");
+        loginTab.addEventListener('click', () => switchAuthTab('login'));
     }
     
-    if (document.getElementById('signup-tab')) {
-        document.getElementById('signup-tab').addEventListener('click', () => switchAuthTab('signup'));
+    if (signupTab) {
+        console.log("Found signup tab");
+        signupTab.addEventListener('click', () => switchAuthTab('signup'));
     }
     
     // معالجات أحداث صفحة الملف الشخصي
-    if (document.getElementById('logout-btn')) {
-        document.getElementById('logout-btn').addEventListener('click', handleLogout);
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        console.log("Found logout button");
+        logoutBtn.addEventListener('click', handleLogout);
     }
     
     // معالجات أحداث صفحة إضافة المنشور
-    if (document.getElementById('publish-btn')) {
-        document.getElementById('publish-btn').addEventListener('click', handlePublishPost);
+    const publishBtn = document.getElementById('publish-btn');
+    const chooseImageBtn = document.getElementById('choose-image-btn');
+    const cameraBtn = document.getElementById('camera-btn');
+    const removeImageBtn = document.getElementById('remove-image-btn');
+    const postImageInput = document.getElementById('post-image');
+    
+    if (publishBtn) {
+        console.log("Found publish button");
+        publishBtn.addEventListener('click', handlePublishPost);
     }
     
-    if (document.getElementById('choose-image-btn')) {
-        document.getElementById('choose-image-btn').addEventListener('click', () => document.getElementById('post-image').click());
+    if (chooseImageBtn) {
+        console.log("Found choose image button");
+        chooseImageBtn.addEventListener('click', () => {
+            if (postImageInput) postImageInput.click();
+        });
     }
     
-    if (document.getElementById('camera-btn')) {
-        document.getElementById('camera-btn').addEventListener('click', openCamera);
+    if (cameraBtn) {
+        console.log("Found camera button");
+        cameraBtn.addEventListener('click', openCamera);
     }
     
-    if (document.getElementById('remove-image-btn')) {
-        document.getElementById('remove-image-btn').addEventListener('click', removeSelectedImage);
+    if (removeImageBtn) {
+        console.log("Found remove image button");
+        removeImageBtn.addEventListener('click', removeSelectedImage);
     }
     
-    if (document.getElementById('post-image')) {
-        document.getElementById('post-image').addEventListener('change', handleImageSelection);
+    if (postImageInput) {
+        console.log("Found post image input");
+        postImageInput.addEventListener('change', handleImageSelection);
     }
     
     // معالجات أحداث صفحة الرسائل
-    if (document.getElementById('send-message-btn')) {
-        document.getElementById('send-message-btn').addEventListener('click', handleSendMessage);
+    const sendMessageBtn = document.getElementById('send-message-btn');
+    if (sendMessageBtn) {
+        console.log("Found send message button");
+        sendMessageBtn.addEventListener('click', handleSendMessage);
     }
     
     // معالجات أحداث صفحة تفاصيل المنشور
-    if (document.getElementById('buy-now-btn')) {
-        document.getElementById('buy-now-btn').addEventListener('click', handleBuyNow);
+    const buyNowBtn = document.getElementById('buy-now-btn');
+    if (buyNowBtn) {
+        console.log("Found buy now button");
+        buyNowBtn.addEventListener('click', handleBuyNow);
     }
     
     // معالجات أحداث صفحة الطلبات
     const filterBtns = document.querySelectorAll('.filter-btn');
     if (filterBtns.length > 0) {
+        console.log("Found filter buttons");
         filterBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 filterBtns.forEach(b => b.classList.remove('active'));
@@ -167,20 +256,29 @@ function attachEventHandlers() {
     }
     
     // معالجات أحداث صفحة تفاصيل الطلب
-    if (document.getElementById('approve-order-btn')) {
-        document.getElementById('approve-order-btn').addEventListener('click', handleApproveOrder);
+    const approveOrderBtn = document.getElementById('approve-order-btn');
+    const rejectOrderBtn = document.getElementById('reject-order-btn');
+    const chatWithBuyerBtn = document.getElementById('chat-with-buyer-btn');
+    const chatWithSellerBtn = document.getElementById('chat-with-seller-btn');
+    
+    if (approveOrderBtn) {
+        console.log("Found approve order button");
+        approveOrderBtn.addEventListener('click', handleApproveOrder);
     }
     
-    if (document.getElementById('reject-order-btn')) {
-        document.getElementById('reject-order-btn').addEventListener('click', handleRejectOrder);
+    if (rejectOrderBtn) {
+        console.log("Found reject order button");
+        rejectOrderBtn.addEventListener('click', handleRejectOrder);
     }
     
-    if (document.getElementById('chat-with-buyer-btn')) {
-        document.getElementById('chat-with-buyer-btn').addEventListener('click', handleChatWithBuyer);
+    if (chatWithBuyerBtn) {
+        console.log("Found chat with buyer button");
+        chatWithBuyerBtn.addEventListener('click', handleChatWithBuyer);
     }
     
-    if (document.getElementById('chat-with-seller-btn')) {
-        document.getElementById('chat-with-seller-btn').addEventListener('click', handleChatWithSeller);
+    if (chatWithSellerBtn) {
+        console.log("Found chat with seller button");
+        chatWithSellerBtn.addEventListener('click', handleChatWithSeller);
     }
 }
 
@@ -196,17 +294,21 @@ function handleLogin(e) {
         return;
     }
     
-    showLoading(true);
+    showLoading(true, 'جاري تسجيل الدخول...');
     
     signInWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
             showLoading(false);
-            // بعد تسجيل الدخول بنجاح، الانتقال إلى الصفحة الرئيسية
-            window.location.href = 'index.html';
+            showAuthMessage('تم تسجيل الدخول بنجاح!', 'success');
+            // بعد تسجيل الدخول بنجاح، الانتقال إلى الصفحة الرئيسية بعد تأخير قصير
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1500);
         })
         .catch((error) => {
             showLoading(false);
             showAuthMessage(getAuthErrorMessage(error.code), 'error');
+            console.error("Login error:", error);
         });
 }
 
@@ -229,7 +331,7 @@ function handleSignup(e) {
         return;
     }
     
-    showLoading(true);
+    showLoading(true, 'جاري إنشاء الحساب...');
     
     createUserWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
@@ -250,18 +352,26 @@ function handleSignup(e) {
         .then(() => {
             showLoading(false);
             showAuthMessage('تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن', 'success');
+            // الانتقال إلى نموذج تسجيل الدخول بعد إنشاء الحساب
             switchAuthTab('login');
         })
         .catch((error) => {
             showLoading(false);
             showAuthMessage(getAuthErrorMessage(error.code), 'error');
+            console.error("Signup error:", error);
         });
 }
 
 function handleLogout() {
+    showLoading(true, 'جاري تسجيل الخروج...');
+    
     signOut(auth).then(() => {
+        showLoading(false);
         // بعد تسجيل الخروج، الانتقال إلى الصفحة الرئيسية
         window.location.href = 'index.html';
+    }).catch((error) => {
+        showLoading(false);
+        console.error("Logout error:", error);
     });
 }
 
@@ -287,7 +397,10 @@ function switchAuthTab(tab) {
 // ==================== دوال المنشورات ====================
 function loadPosts() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    if (!postsContainer) {
+        console.error("Posts container not found");
+        return;
+    }
     
     postsContainer.innerHTML = '<div class="loading-text">جاري تحميل المنشورات...</div>';
     
@@ -307,6 +420,9 @@ function loadPosts() {
             const postCard = createPostCard(post);
             postsContainer.appendChild(postCard);
         });
+    }, (error) => {
+        console.error("Error loading posts:", error);
+        postsContainer.innerHTML = '<div class="no-orders">حدث خطأ في تحميل المنشورات</div>';
     });
 }
 
@@ -320,12 +436,12 @@ function createPostCard(post) {
     
     postCard.innerHTML = `
         <div class="post-image">
-            ${post.imageUrl ? `<img src="${post.imageUrl}" alt="${post.title}">` : 
+            ${post.imageUrl ? `<img src="${post.imageUrl}" alt="${post.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='<i class=\\'fas fa-image\\'></i>';">` : 
             `<i class="fas fa-image"></i>`}
         </div>
         <div class="post-content">
-            <h3 class="post-title">${post.title}</h3>
-            <p class="post-description">${post.description}</p>
+            <h3 class="post-title">${post.title || 'بدون عنوان'}</h3>
+            <p class="post-description">${post.description || 'بدون وصف'}</p>
             <div class="post-meta">
                 <span class="post-price">${post.price ? `${post.price} ر.س` : 'السعر: غير محدد'}</span>
                 <span class="post-author">
@@ -375,10 +491,15 @@ function handlePublishPost(e) {
             (error) => {
                 showLoading(false);
                 showMessage('فشل في رفع الصورة: ' + error.message, 'error');
+                console.error("Upload error:", error);
             },
             () => {
                 getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
                     savePostToDatabase(title, description, price, location, phone, downloadURL, user);
+                }).catch((error) => {
+                    showLoading(false);
+                    showMessage('فشل في الحصول على رابط الصورة: ' + error.message, 'error');
+                    console.error("Get download URL error:", error);
                 });
             }
         );
@@ -415,12 +536,16 @@ function savePostToDatabase(title, description, price, location, phone, imageUrl
         .catch((error) => {
             showLoading(false);
             showMessage('فشل في نشر المنشور: ' + error.message, 'error');
+            console.error("Save post error:", error);
         });
 }
 
 function loadPostDetail(postId) {
     const postDetailContent = document.getElementById('post-detail-content');
-    if (!postDetailContent) return;
+    if (!postDetailContent) {
+        console.error("Post detail content not found");
+        return;
+    }
     
     postDetailContent.innerHTML = '<div class="loading-text">جاري تحميل تفاصيل المنشور...</div>';
     
@@ -436,12 +561,12 @@ function loadPostDetail(postId) {
         currentPost = post;
         
         postDetailContent.innerHTML = `
-            ${post.imageUrl ? `<img src="${post.imageUrl}" alt="${post.title}" class="post-detail-image">` : 
+            ${post.imageUrl ? `<img src="${post.imageUrl}" alt="${post.title}" class="post-detail-image" onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=\\'post-detail-image\\' style=\\'display:flex;align-items:center;justify-content:center;background:#f5f5f5;\\'><i class=\\'fas fa-image\\' style=\\'font-size:3rem;color:#ccc;\\'></i></div>';">` : 
             `<div class="post-detail-image" style="display:flex;align-items:center;justify-content:center;background:#f5f5f5;">
                 <i class="fas fa-image" style="font-size:3rem;color:#ccc;"></i>
             </div>`}
-            <h2 class="post-detail-title">${post.title}</h2>
-            <p class="post-detail-description">${post.description}</p>
+            <h2 class="post-detail-title">${post.title || 'بدون عنوان'}</h2>
+            <p class="post-detail-description">${post.description || 'بدون وصف'}</p>
             <div class="post-detail-meta">
                 <div class="meta-item">
                     <i class="fas fa-tag"></i>
@@ -453,7 +578,7 @@ function loadPostDetail(postId) {
                 </div>` : ''}
                 <div class="meta-item">
                     <i class="fas fa-phone"></i>
-                    <span>${post.phone}</span>
+                    <span>${post.phone || 'غير متوفر'}</span>
                 </div>
             </div>
             <div class="post-detail-author">
@@ -466,6 +591,9 @@ function loadPostDetail(postId) {
                 </div>
             </div>
         `;
+    }, (error) => {
+        console.error("Error loading post detail:", error);
+        postDetailContent.innerHTML = '<div class="no-orders">حدث خطأ في تحميل تفاصيل المنشور</div>';
     });
 }
 
@@ -492,6 +620,7 @@ function handleBuyNow() {
         .catch((error) => {
             showLoading(false);
             showMessage('فشل في إنشاء الطلب: ' + error.message, 'error');
+            console.error("Create order error:", error);
         });
 }
 
@@ -516,13 +645,17 @@ async function createOrder(userId, post) {
         
         return newOrderRef.key;
     } catch (error) {
+        console.error("Error creating order:", error);
         throw error;
     }
 }
 
 function loadOrders(filter = 'all') {
     const ordersContainer = document.getElementById('orders-container');
-    if (!ordersContainer) return;
+    if (!ordersContainer) {
+        console.error("Orders container not found");
+        return;
+    }
     
     ordersContainer.innerHTML = '<div class="loading-text">جاري تحميل الطلبات...</div>';
     
@@ -576,6 +709,9 @@ function loadOrders(filter = 'all') {
             const orderElement = createPostOrderItem(postData);
             ordersContainer.appendChild(orderElement);
         });
+    }, (error) => {
+        console.error("Error loading orders:", error);
+        ordersContainer.innerHTML = '<div class="no-orders">حدث خطأ في تحميل الطلبات</div>';
     });
 }
 
@@ -590,7 +726,7 @@ function createPostOrderItem(postData) {
     
     orderElement.innerHTML = `
         <div class="order-header">
-            <h3 class="order-title">${postData.postTitle}</h3>
+            <h3 class="order-title">${postData.postTitle || 'بدون عنوان'}</h3>
             <span class="order-count">${postData.orders.length} طلب</span>
         </div>
         <div class="order-statuses">
@@ -616,7 +752,7 @@ function showPostOrders(postData) {
             <i class="fas fa-arrow-right"></i> العودة إلى قائمة الطلبات
         </button>
         <div class="post-orders-header">
-            <h3>${postData.postTitle}</h3>
+            <h3>${postData.postTitle || 'بدون عنوان'}</h3>
             <p>إدارة طلبات هذا المنشور</p>
         </div>
     `;
@@ -650,7 +786,7 @@ function createIndividualOrderItem(order) {
     
     orderElement.innerHTML = `
         <div class="order-header">
-            <h3 class="order-title">طلب من ${order.buyerName}</h3>
+            <h3 class="order-title">طلب من ${order.buyerName || 'مشتري'}</h3>
             <span class="order-status ${statusClass}">${statusText}</span>
         </div>
         <div class="order-meta">
@@ -669,7 +805,10 @@ function createIndividualOrderItem(order) {
 
 function loadOrderDetail(orderId) {
     const orderDetailContent = document.getElementById('order-detail-content');
-    if (!orderDetailContent) return;
+    if (!orderDetailContent) {
+        console.error("Order detail content not found");
+        return;
+    }
     
     orderDetailContent.innerHTML = '<div class="loading-text">جاري تحميل تفاصيل الطلب...</div>';
     
@@ -700,7 +839,7 @@ function loadOrderDetail(orderId) {
                 <h3>معلومات الطلب</h3>
                 <div class="order-detail-item">
                     <span class="order-detail-label">المنشور:</span>
-                    <span class="order-detail-value">${order.postTitle}</span>
+                    <span class="order-detail-value">${order.postTitle || 'بدون عنوان'}</span>
                 </div>
                 <div class="order-detail-item">
                     <span class="order-detail-label">السعر:</span>
@@ -720,11 +859,11 @@ function loadOrderDetail(orderId) {
                 <h3>معلومات المشتري</h3>
                 <div class="order-detail-item">
                     <span class="order-detail-label">الاسم:</span>
-                    <span class="order-detail-value">${order.buyerName}</span>
+                    <span class="order-detail-value">${order.buyerName || 'غير متوفر'}</span>
                 </div>
                 <div class="order-detail-item">
                     <span class="order-detail-label">الهاتف:</span>
-                    <span class="order-detail-value">${order.buyerPhone}</span>
+                    <span class="order-detail-value">${order.buyerPhone || 'غير متوفر'}</span>
                 </div>
             </div>
         `;
@@ -737,6 +876,9 @@ function loadOrderDetail(orderId) {
             if (approveBtn) approveBtn.style.display = 'none';
             if (rejectBtn) rejectBtn.style.display = 'none';
         }
+    }, (error) => {
+        console.error("Error loading order detail:", error);
+        orderDetailContent.innerHTML = '<div class="no-orders">حدث خطأ في تحميل تفاصيل الطلب</div>';
     });
 }
 
@@ -759,6 +901,7 @@ function handleApproveOrder() {
     .catch((error) => {
         showLoading(false);
         showMessage('فشل في قبول الطلب: ' + error.message, 'error');
+        console.error("Approve order error:", error);
     });
 }
 
@@ -781,6 +924,7 @@ function handleRejectOrder() {
     .catch((error) => {
         showLoading(false);
         showMessage('فشل في رفض الطلب: ' + error.message, 'error');
+        console.error("Reject order error:", error);
     });
 }
 
@@ -821,13 +965,18 @@ function loadMessages() {
                 userData.id = userId;
                 openChat(userData);
             }
+        }, (error) => {
+            console.error("Error loading user info:", error);
         });
     }
 }
 
 function loadAllUsersForAdmin(currentUserId) {
     const usersList = document.getElementById('users-list');
-    if (!usersList) return;
+    if (!usersList) {
+        console.error("Users list not found");
+        return;
+    }
     
     usersList.innerHTML = '<div class="loading-text">جاري تحميل المستخدمين...</div>';
     
@@ -883,6 +1032,9 @@ function loadAllUsersForAdmin(currentUserId) {
         
         // تحميل معلومات المستخدمين
         loadUsersInfo(Array.from(usersMap.keys()), currentUserId, usersMap);
+    }, (error) => {
+        console.error("Error loading messages:", error);
+        usersList.innerHTML = '<div class="no-users">حدث خطأ في تحميل المحادثات</div>';
     });
 }
 
@@ -918,6 +1070,9 @@ function loadUsersInfo(userIds, currentUserId, usersMap) {
         }
         
         displayUsersList(usersToShow, currentUserId);
+    }, (error) => {
+        console.error("Error loading users:", error);
+        usersList.innerHTML = '<div class="no-users">حدث خطأ في تحميل المستخدمين</div>';
     });
 }
 
@@ -946,7 +1101,7 @@ function displayUsersList(users, currentUserId) {
                 <i class="fas fa-user"></i>
             </div>
             <div class="user-info">
-                <div class="user-name">${user.name}</div>
+                <div class="user-name">${user.name || 'مستخدم'}</div>
                 <div class="user-status">${messageContent}</div>
             </div>
             <div class="message-info">
@@ -970,7 +1125,7 @@ function openChat(userData) {
     const messageInputContainer = document.getElementById('message-input-container');
     
     if (currentChatUser) {
-        currentChatUser.textContent = userData.name;
+        currentChatUser.textContent = userData.name || 'مستخدم';
     }
     
     if (messageInputContainer) {
@@ -983,7 +1138,10 @@ function openChat(userData) {
 
 function displayMessages(userId) {
     const messagesContainer = document.getElementById('messages-container');
-    if (!messagesContainer) return;
+    if (!messagesContainer) {
+        console.error("Messages container not found");
+        return;
+    }
     
     messagesContainer.innerHTML = '<div class="loading-text">جاري تحميل الرسائل...</div>';
     
@@ -1022,6 +1180,9 @@ function displayMessages(userId) {
         
         // التمرير إلى أحدث رسالة
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, (error) => {
+        console.error("Error loading messages:", error);
+        messagesContainer.innerHTML = '<div class="no-chat-selected">حدث خطأ في تحميل الرسائل</div>';
     });
 }
 
@@ -1038,7 +1199,7 @@ function addMessageToChat(message, userId) {
     const messageTime = message.timestamp ? formatDate(message.timestamp, true) : '';
     
     messageElement.innerHTML = `
-        <div class="message-content">${message.content}</div>
+        <div class="message-content">${message.content || ''}</div>
         <div class="message-time">${messageTime}</div>
     `;
     
@@ -1064,8 +1225,12 @@ function markMessagesAsRead(userId) {
         });
         
         if (Object.keys(updates).length > 0) {
-            update(ref(database, 'messages'), updates);
+            update(ref(database, 'messages'), updates).catch((error) => {
+                console.error("Error marking messages as read:", error);
+            });
         }
+    }, (error) => {
+        console.error("Error loading messages for mark as read:", error);
     });
 }
 
@@ -1096,13 +1261,17 @@ function sendMessageToUser(message, user, receiverId) {
     set(newMessageRef, newMessage)
         .catch((error) => {
             showMessage('فشل في إرسال الرسالة: ' + error.message, 'error');
+            console.error("Send message error:", error);
         });
 }
 
 // ==================== دوال الملف الشخصي ====================
 function loadUserProfile() {
     const userInfo = document.getElementById('user-info');
-    if (!userInfo) return;
+    if (!userInfo) {
+        console.error("User info container not found");
+        return;
+    }
     
     const user = auth.currentUser;
     if (!user) {
@@ -1143,6 +1312,9 @@ function loadUserProfile() {
                 <span>${userData.isAdmin ? 'مدير النظام' : 'مستخدم عادي'}</span>
             </div>
         `;
+    }, (error) => {
+        console.error("Error loading user profile:", error);
+        userInfo.innerHTML = '<div class="no-orders">حدث خطأ في تحميل المعلومات</div>';
     });
 }
 
@@ -1160,6 +1332,8 @@ function loadAdminUsers() {
                 }
             });
         }
+    }, (error) => {
+        console.error("Error loading admin users:", error);
     });
 }
 
@@ -1377,3 +1551,9 @@ function removeSelectedImage() {
     imageName.textContent = 'لم يتم اختيار صورة';
     imagePreview.classList.add('hidden');
 }
+
+// جعل الدوال متاحة globally للاستخدام في وسم onerror للصور
+window.handleImageError = function(img) {
+    img.style.display = 'none';
+    img.parentNode.innerHTML = '<i class="fas fa-image"></i>';
+};
