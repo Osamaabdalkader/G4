@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسريع - إدارة الطلبات</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- شريط الرأس -->
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="back-icon">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <h1>إدارة الطلبات</h1>
+        </div>
+    </header>
+
+    <!-- صفحة الطلبات للإدارة -->
+    <main class="page">
+        <div class="container">
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">الكل</button>
+                <button class="filter-btn" data-filter="pending">قيد الانتظار</button>
+                <button class="filter-btn" data-filter="approved">مقبولة</button>
+                <button class="filter-btn" data-filter="rejected">مرفوضة</button>
+            </div>
+            
+            <div id="orders-container" class="orders-list">
+                <!-- الطلبات ستظهر هنا -->
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="firebase.js"></script>
+    <script type="module" src="app.js"></script>
+    <script type="module" src="admin.js"></script>
+    <script type="module">
+        import { loadOrders, setupOrderFilters } from './admin.js';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            loadOrders();
+            setupOrderFilters();
+        });
+    </script>
+</body>
+</html>se-order-detail" class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div id="order-detail-content">
+                <!-- محتوى تفاصيل الطلب سيظهر هنا -->
+            </div>
+            
+            <div class="order-actions">
+                <button id="approve-order-btn" class="btn btn-success">قبول الطلب</button>
+                <button id="reject-order-btn" class="btn btn-danger">رفض الطلب</button>
+                <button id="chat-with-buyer-btn" class="btn btn-outline">التحدث مع المشتري</button>
+                <button id="chat-with-seller-btn" class="btn btn-outline">التحدث مع البائع</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="admin.js"></script>
+</body>
+</html>
